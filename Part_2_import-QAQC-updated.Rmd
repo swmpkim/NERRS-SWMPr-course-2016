@@ -1,0 +1,303 @@
+---
+title: "SWMPr Workshop Part 2: Importing data and QAQC with SWMPr"
+author: "Kim Cressman"
+date: "October 27, 2016; updated July 5, 2017"
+output:
+  html_document:
+    keep_md: true
+    fig_width: 6
+    fig_height: 6
+---
+
+<br>
+Using `read.csv()` is all well and good if you're not dealing with a lot of data.
+
+<br>
+But with SWMP data, there's a lot to keep up with, and you could be using it for different projects. You don't want to have to keep multiple copies of the same data on your computer, right? You just want it in one place, and read it in from there. But this will probably be different from your working directory, where you want to save output.
+
+<br>
+__Enter the `import_local` function of SWMPr.__
+
+<br>
+First, open the SWMPr package:
+
+```{r, opts_chunk$set(message=FALSE, warning=FALSE), message=FALSE, warning=FALSE}
+library(SWMPr)
+```
+<br>
+You still want to set a working directory.
+
+```{r}
+setwd("C:/Users/kimberly.cressman/Desktop/NERRS SWMPr course 2016")
+```
+<br>
+
+And now, you're going to give R a path to your data.
+
+<br>
+Again, you can name this anything you want, but you should pick something that makes sense.
+
+```{r}
+data.path <- "C:/Users/kimberly.cressman/Desktop/NERRS SWMPr course 2016" 
+```
+
+<br>
+
+__Notice:__
+
+*  The path is in quotation marks, just like when you're setting the working directory.
+*  _Unlike_ setting the working directory, this does not go in parentheses.
+*  Here, my data path is the same as my working directory, but that's just because of this training. In my real workflow, it's a different location.
+
+<br>
+
+If you only want to work with one file, your command would look like this:
+
+```{r}
+wqdat <- import_local(data.path, "gndpcwq2015")
+```
+
+<br>
+
+__Notice:__
+
+*  You don't have to include ".csv"
+*  You _do_ have to use quotation marks around what you're looking for.
+*  You still have to come up with a name for what you're reading in.
+
+***
+
+Check out your file; it should look pretty similar to what you read in earlier.
+
+```{r}
+head(wqdat)
+tail(wqdat)
+summary(wqdat)
+str(wqdat)
+```
+
+<br>
+
+__There are a few differences though:__
+
+*  capitalization has changed - SWMPr has made all of the column names entirely lower case.
+*  datetimestamp is already in the proper format (`POSIXct`)
+*  There are some attributes at the bottom. This is a form of metadata.
+
+***
+
+<br>
+__Now, let's read in multiple files.__ 
+
+Let's read in everything in that folder for `gndpcwq`. I'm adding in `trace=TRUE` so I can see the progress.
+
+```{r}
+wqdat <- import_local(data.path, "gndpcwq", trace=TRUE)
+```
+
+<br>
+
+Again, check out the file - there's a lot more data!
+
+```{r}
+summary(wqdat)
+```
+
+***
+
+<br>
+__How do we find out the specific qc codes in this file?__
+
+```{r}
+qctable <- qaqcchk(wqdat)
+print.data.frame(qctable)
+```
+
+<br>
+That was for everything. If we only want to see what's relevant to temp, we can try this:
+
+```{r}
+unique(wqdat$f_temp)
+```
+
+
+<br>
+Most of the time, you're going to want to get rid of data that has rejected (-3) and suspect (1) flags associated with it, and only keep 0 (and maybe 5, which indicates corrected data) flags. Not always though, and there is a way to keep what you want.
+
+***
+
+<br>
+Let's do a plot of temperature again, so we can see our starting point. We'll do a before and after comparison to see what the `qaqc` command can do for us.
+
+```{r}
+summary(wqdat$temp)
+plot(temp ~ datetimestamp, data = wqdat,
+     type = "l",
+     col = "red",
+     main = "Temperature at PC 2012 - 2015",
+     xlab = "Date",
+     ylab = "Temp (C)")
+```
+
+***
+
+<br>
+Now, let's only keep data flagged with a 0. We'll put this into a new data frame called wqdat2.
+
+```{r}
+wqdat2 <- qaqc(wqdat, qaqc_keep = 0)
+summary(wqdat2)
+```
+
+<br>
+
+__Notice, the qc columns went away - SWMPr automatically removes them.__  This makes the data frame considerably smaller (look in the 'Environment' tab in the top right corner of RStudio to see the difference in size between wqdat and wqdat2). 
+
+<br>
+The crazy temperature readings went away too, as you can see in the summary and in a new plot:
+
+```{r}
+plot(temp ~ datetimestamp, data = wqdat2,
+     type = "l",
+     col = "red",
+     main = "Temperature at PC 2012 - 2015",
+     xlab = "Date",
+     ylab = "Temp (C)")
+```
+
+<br>
+
+__Sometimes you want to keep suspect flags too (1), or corrected data (5).__ 
+
+The DMC and CDMO have fairly strict guidelines on what needs to get flagged. They want to make sure to call attention to any potentially problematic data and let the user decide what to keep or get rid of - so there may be things that are flagged that you want to keep.
+
+*  Look at what the qaqcchk() command generates to see what QC codes are in your file.
+*  Look in the metadata to see what those codes mean. Some of them are less severe than others. For example, you might not mind keeping:
+    +  <1> [SDG] - sensor diagnostics
+    +  <1> (CWD) - collected at wrong depth
+    +  <-3> [SCF] for depth - rejected due to conductivity sensor failure (otherwise it would be pretty rare to keep rejected data)
+    +  <-4> - nutrient value below detection
+    +  <5> - corrected data
+*  Talk to your SWMP tech and get their thoughts on common data issues and what they see as more or less serious.
+
+<br>
+__Note: Before 2008, QC was done differently.__ There was no equivalent _within the data file_ to a <1>/suspect flag - data was either kept or deleted, and any notes about being suspect were included in the metadata documents. If you're trying to do strong long-term analyses, you will need to deal with those differences somehow.
+
+***
+
+<br>
+__Back to keeping more than just 0 flags.__
+
+Here's how you do it:
+
+```{r}
+wqdat2 <- qaqc(wqdat, qaqc_keep = c(0,1,5))
+```
+
+<br>
+
+This doesn't change our temperature data because we didn't have any 1 or 5 flags in the first place (but it will affect some of the other parameters).
+
+***
+
+<br>
+You can also choose to keep specific letter codes. We'll practice with the catastrophic temperature probe failure because it's easy to see if what we're doing works.
+
+```{r}
+wqdat2 <- qaqc(wqdat, qaqc_keep = c(0, 'STF'))
+summary(wqdat2$temp)
+```
+
+<br>
+
+SWMPr is doing something called "partial character matching" - you put in a piece of the QC code that you want to keep, and SWMPr finds anything that contains that piece.
+
+<br>
+__There will be times that you want to be more specific__ than keeping all <1>s, but you can't narrow it down to just the character code. For example, you might have a file with all of these flags:
+
+
+*  <1> [SPC]  -- suspect, failed post-cal
+*  <1> [CBF]  -- suspect, affected by biofouling
+*  <-3> [SPC]  -- rejected, failed post-cal
+*  <-3> [CBF]  -- rejected, affected by biofouling
+
+<br>
+
+You might want to see if keeping the <1> [CBF] data makes a difference in your analysis. You don't want to keep all <1>s, and you don't want to keep all [CBF]s. You want to be specific.
+
+<br>
+We don't actually have those codes here, so we're going to stick with the example of <-3> [STF] (that bad data due to temperature probe failure; reading as low as -991.5 degrees C).
+
+<br>
+You might think the way to do this is:
+
+
+```{r}
+wqdat2 <- qaqc(wqdat, qaqc_keep = c(0, '<-3> [STF]'))
+```
+
+<br>
+
+But from the summary, we see that didn't work - it only kept good data.
+
+```{r}
+summary(wqdat2$temp)
+```
+
+<br>
+
+Remember how we keep talking about quotation marks and capitalization being important? R is _very_ picky about syntax.
+
+<br>
+Brackets `[]` have a specific meaning when they're used in character matching, and that's not the meaning we're going for here. So we have to use two backslashes in front of each bracket, like this:
+
+
+```{r}
+wqdat2 <- qaqc(wqdat, qaqc_keep = c(0, '<-3> \\[STF\\]'))
+```
+
+<br>
+
+And look! We retained the data with that code:
+
+```{r}
+summary(wqdat2$temp)
+```
+
+***
+
+<br>
+Don't worry about that too much - __the vast majority of the time, you're just going to be doing something easy__ like we did above, and keeping certain numeric codes.
+
+
+```{r}
+wqdat2 <- qaqc(wqdat, qaqc_keep = c(0,1,5))
+```
+
+<br>
+
+Let's look at this plot again.
+
+```{r}
+plot(temp ~ datetimestamp, data = wqdat2,
+     type = "l",
+     col = "red",
+     main = "Temperature at PC 2012 - 2015",
+     xlab = "Date",
+     ylab = "Temp (C)")
+```
+
+***
+<br>
+
+Readings every 15 minutes can make for a noisy graph. You have daily variations, tidal variations, seasonal variations, and annual variations. 
+
+<br>
+SWMPr can help us with all of this too! 
+
+<br>
+So now, Kari will talk about aggregating data into more manageable chunks.
+
+<br>
+<br>
+.

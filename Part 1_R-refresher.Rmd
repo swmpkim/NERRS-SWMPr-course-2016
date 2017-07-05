@@ -1,0 +1,325 @@
+---
+title: "SWMPr Workshop Part 1: Refresher on reading in data, and beginning to plot"
+author: "Kim Cressman"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    fig_width: 6
+    fig_height: 6
+---
+
+<br>
+
+#### Step 1: Set the Working Directory
+
+
+1.  From the Rstudio menu bar, select 'Session' --> 'Set Working Directory' --> 'Choose Directory' (or use keyboard shortcut Ctrl + Shift + H) 
+2.  You will see in the console a line that looks like this:
+
+```{r, opts_chunk$set(message=FALSE, warning=FALSE)}
+setwd("C:/Users/kimberly.cressman/Desktop/NERRS SWMPr course 2016")
+```
+  +  notice the forward slashes!
+      +  you may have to change yours if you're copying from windows explorer
+  +  and the quotation marks!
+  +  and the capitalization.
+      +  R is sensitive to capitalization.
+
+
+3. Copy and paste that into your script window so you can just default to it every time you use this script
+    +  if Rstudio didn't open with a blank script, click on the plus sign to create one.
+
+
+***
+
+#### Step 2: Read in a file (from your working directory)
+
+Use the read.csv() command.
+
+*  The file name needs to be inside quotation marks (double "" or single '')
+*  Make sure the capitalization is correct
+*  Remember to include the file extension (.csv)
+*  Make sure your file is a .csv (there are packages that will read in Excel files for you, but .csv is simplist)
+    + To convert a .xlsx file to a .csv, go to File --> Save as --> CSV (Comma Delimited)
+
+<br>
+`read.csv("GNDPCWQ2015.csv")`
+
+<br>
+To run a line of code:
+
+*  from the console: Enter
+*  from a script - __you should use scripts__
+    +  Ctrl + Enter   OR
+    +  Ctrl + R   OR
+    +  Run button in upper right corner of script panel
+    +  You can highlight and run more than one line in a script with any of these methods
+
+<br>
+Notice how that read it straight into your console?
+
+<br>
+If you want to work with the data (which you do!), you have to assign a name to it.
+
+<br>
+`my_object <- read.csv("my_file.csv")`
+
+<br>
+__You can choose to name it whatever you want - but you should pick a name that makes sense!__
+
+Trust us: your object name will help you follow along and will make it easier to remember if it makes sense.
+
+```{r}
+wqdat <- read.csv("gndpcwq2015.csv")
+```
+
+***
+
+<br>
+
+#### Step 3: See what your new object looks like
+
+<br>
+__Look at the head of the data__ (the first 6 rows)
+
+<br>
+Use the head() function:
+
+```{r}
+head(wqdat)
+```
+
+<br>
+Notice, you did __not__ have to put _wqdat_ inside quotation marks. It is an object recognized by R. (You will also see it in the environment in the top right panel of RStudio.)
+
+***
+
+<br>
+You can look at more rows if you want to. Let's look at the first 10 rows:
+
+```{r}
+head(wqdat, 10)
+```
+
+***
+
+<br>
+
+__Look at the end of the data__
+
+<br>
+Again, the default is 6 rows, but you can tell it to show you more.
+
+```{r}
+tail(wqdat)
+```
+
+***
+<br>
+
+__Look at summary statistics of the data__
+
+
+This shows you a lot of useful information: min and max, quartiles, median and average, and the number of NAs.
+
+<br>
+__Note:__ NA is code for missing data.
+
+<br>
+_Hint:_ by looking at this output, you can see if there are major problems in your data.
+
+
+```{r}
+summary(wqdat)
+```
+
+***
+<br>
+
+__Look only at the column names__
+
+This is especially helpful if you've been working on a script for a while but don't remember exactly how the name of your variable is showing up (capitalization, underscores, etc. - we name things differently sometimes in different files!)
+
+```{r}
+names(wqdat)
+```
+
+
+***
+
+<br>
+__Look at the structure of the dataset__
+
+<br>
+This shows you what _type_ of variable each column is: date, numeric, character, logical (true/false), etc.
+
+```{r}
+str(wqdat)
+```
+
+
+***
+
+<br>
+
+#### Step 4: Make a plot
+
+<br>
+Let's look at temperature over time. Basic plots are easy:
+
+`plot(y ~ x, data = your data)`
+
+<br>
+In this specific case, it's:
+
+`plot(Temp ~ DateTimeStamp, data=wqdat)`
+
+<br>
+But this throws errors! Let's look at just these two columns of data by using the $ selector:
+
+```{r}
+str(wqdat$Temp)
+str(wqdat$DateTimeStamp)
+```
+
+***
+
+<br>
+__`DateTimeStamp`__ is seen as a factor. We need it to be seen as a date.
+
+<br>
+What we'll do is turn it into a __class__ called `POSIXct`, which is a good one to work with date-times. (There's also a class called `Date` if you're ever working with a simpler dataset - date format is a bit easier to work with.)
+
+<br>
+__This is something SWMPr does automatically__ as it reads in files, but we're not there yet in this course. So we'll do it by hand.
+
+***
+
+I'm going to make a new column, called `DateTime`. You could write over the original column if you want to. I'm hesitant to do that until I know I have something working.
+
+<br>
+We have to tell R what format the date/time in the current column is in, so that everything goes in the right place when it's turned into `POSIXct`. Notice the capitalization! (`%m` = month; `%M` = minutes)
+
+<br>
+To make a new column, we're doing the same thing we did when we created the data frame in the first place:
+
+`Data_Frame$New_Column <- whatever we're doing to create the new column`
+
+
+```{r}
+wqdat$DateTime <- as.POSIXct(wqdat$DateTimeStamp, format="%m/%d/%Y %H:%M", tz="America/Regina")
+```
+
+<br>
+Again, format is how you want your date to be read. `%m` is numerical month (01 = January), `%d` is numerical day (1-31), `%Y` is the numerical 4 digit year (ex. 2015), `%H` is hour, and `%M` is minute. This is how the SWMP data is formatted, so we’ll stick with it, but you could format months for example as `%b` (Jan, Feb, Mar, etc).
+
+<br>
+The timezone code matters - POSIXct will automatically adjust time stamps for Daylight Savings Time, and because we don't adjust our monitoring equipment, we definitely don't want R making that adjustment in the background.
+
+Click here to find out which time zone is appropriate for you:
+__need the link from Marcus__
+
+***
+
+<br>
+We better check to make sure everything looks right before proceeding:
+
+```{r}
+head(wqdat)
+str(wqdat)
+```
+
+***
+
+<br>
+Okay. Let's try this plot again:
+
+```{r}
+plot(Temp ~ DateTime, data=wqdat)
+```
+
+
+***
+
+<br>
+Let's change a few options - turn it into a line, and make that line red. Let's also give it some titles.
+
+To figure out other plot options, type this into your console:
+
+`?plot`
+
+
+```{r}
+plot(Temp ~ DateTime, data = wqdat,
+     type = "l",
+     col = "red",
+     main = "Temperature at PC in 2015",
+     xlab = "Date",
+     ylab = "Temp (C)")
+```
+
+
+***
+
+<br>
+We can even change that y-axis to a more realistic scale:
+
+```{r}
+plot(Temp ~ DateTime, data = wqdat,
+     type = "l",
+     col = "red",
+     main = "Temperature at PC in 2015",
+     xlab = "Date",
+     ylab = "Temp (C)",
+     ylim = c(-5, 40))
+```
+
+***
+<br>
+We can also add that special degree symbol to make it publication-ready (_fun fact_: Kim learned this from Kari as they were planning this workshop):
+
+```{r}
+plot(Temp ~ DateTime, data = wqdat,
+     type = "l",
+     col = "red",
+     main = "Temperature at PC in 2015",
+     xlab = "Date",
+     ylab = expression(paste("Temperature (",degree,"C)")),
+     ylim = c(-5, 40))
+```
+
+***
+
+<br>
+__So we've already got several needs, and we're not even to the analysis stage yet:__
+
+*  We need an easy way to get rid of bad data.
+*  We need an easy way to turn date-time stamps into POSIXct.
+*  We need an easy way to read in a lot of SWMP data and do each of the above.
+
+<br>
+__Enter the SWMPr package__
+
+*  What is a package, generally, and why do I need them?
+*  What are some popular packages?
+    +  `ggplot2` for easy graphing
+    +  `dplyr` and `tidyr` for data wrangling
+    +  `wq` and `EnvStats` for statistics
+    +  `openair` for wind roses
+    +  `knitr` for generating nice documents from code and outputs
+    +  `grDevices` for more color and font options
+*  How do I get packages onto my computer?
+    +  `install.packages("SWMPr")` for just one
+    +  `install.packages(c("SWMPr", "tidyr", "ggplot2"))` for multiple
+*  How do I use a package?
+    +  load at the beginning of a session using either:
+      +  `library(SWMPr)` in your script
+      +  check `SWMPr` on the Packages tab in the bottom right panel of RStudio
+    +  notice that you _do_ need quotation marks to install a package, but you _do not_ use them to load a package.
+    
+<br>
+__Next, we'll use SWMPr to read in and QC some real data!__
+    
+<br>
+<br>
+.
